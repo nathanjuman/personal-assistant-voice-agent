@@ -76,7 +76,7 @@ class AgentEndEvent:
     ts: int
 
     @classmethod
-    def create(cls, text: str) -> "AgentEndEvent":
+    def create(cls) -> "AgentEndEvent":
         """
 
         :rtype: "AgentEndEvent"

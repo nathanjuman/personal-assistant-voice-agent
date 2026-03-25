@@ -5,14 +5,12 @@ from typing import AsyncIterator
 from uuid import uuid4
 
 import uvicorn
-from IPython.core.magic_arguments import argument_group
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from langchain.agents import create_agent
 from langchain.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableGenerator
-from langchain_core.tracers import event_stream
 from langgraph.checkpoint.memory import InMemorySaver
 from starlette.staticfiles import StaticFiles
 
@@ -50,15 +48,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+"""
+
+Tool Functions
+
+"""
+
+
 system_prompt = ""
 
 agent = create_agent(
-    model=None,
+    model="anthropic:claude-haiku-4-5",
     tools=[],
     system_prompt=system_prompt,
     checkpointer=InMemorySaver()
 )
-
 
 
 async def _stt_stream(audio_stream: AsyncIterator[bytes]) -> AsyncIterator[VoiceAgentEvent]:
@@ -178,17 +182,22 @@ async def websocket_endpoint(websocket: WebSocket):
 
     async def websocket_audio_stream() -> AsyncIterator[bytes]:
         while True:
-            data = await websocket.receive_bytes()
+            try:
+                data = await websocket.receive_bytes()
+            except WebSocketDisconnect:
+                return
             yield data
 
     output_audio_stream = pipeline.atransform(websocket_audio_stream())
 
-    # Process events from pipeline and send back to client
-    async for event in output_audio_stream:
-        await websocket.send_json(event_to_dict(event))
+    try:
+        # Process events from pipeline and send back to client
+        async for event in output_audio_stream:
+            await websocket.send_json(event_to_dict(event))
+    except WebSocketDisconnect:
+        pass
 
-
-app.mount("/", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host= "0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", port=8000, reload=True)

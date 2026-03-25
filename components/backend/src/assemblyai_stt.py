@@ -16,7 +16,7 @@ from typing import AsyncIterator, Optional
 from urllib.parse import urlencode
 
 import websockets
-from websockets.client import WebSocketClientProtocol
+from websockets import ClientConnection
 
 from events import STTChunkEvent, STTEvent, STTOutputEvent
 
@@ -27,6 +27,8 @@ class AssemblyAISTT:
         api_key: Optional[str] = None,
         sample_rate: int = 16000,
         format_turns: bool = True,
+        speech_model: Optional[str] = None,
+        encoding: str = "pcm_s16le",
     ):
         self.api_key = api_key or os.getenv("ASSEMBLYAI_API_KEY")
         if not self.api_key:
@@ -34,7 +36,13 @@ class AssemblyAISTT:
 
         self.sample_rate = sample_rate
         self.format_turns = format_turns
-        self._ws: Optional[WebSocketClientProtocol] = None
+        self.speech_model = (
+            speech_model
+            or os.getenv("ASSEMBLYAI_SPEECH_MODEL")
+            or "universal-streaming-english"
+        )
+        self.encoding = encoding
+        self._ws: Optional[ClientConnection] = None
         self._connection_signal = asyncio.Event()
         self._close_signal = asyncio.Event()
 
@@ -70,11 +78,15 @@ class AssemblyAISTT:
                                 turn_is_formatted = message.get(
                                     "turn_is_formatted", False
                                 )
+                                end_of_turn = message.get("end_of_turn", False)
 
-                                if turn_is_formatted:
+                                # AssemblyAI can send formatted interim turns before
+                                # the utterance is actually complete. Only emit
+                                # stt_output once the turn is marked end_of_turn.
+                                if turn_is_formatted and end_of_turn:
                                     if transcript:
                                         yield STTOutputEvent.create(transcript)
-                                else:
+                                elif transcript:
                                     yield STTChunkEvent.create(transcript)
 
                             elif message_type == "Termination":
@@ -100,7 +112,7 @@ class AssemblyAISTT:
         self._ws = None
         self._close_signal.set()
 
-    async def _ensure_connection(self) -> WebSocketClientProtocol:
+    async def _ensure_connection(self) -> ClientConnection:
         if self._close_signal.is_set():
             raise RuntimeError(
                 "AssemblyAISTT tried establishing a connection after it was closed"
@@ -111,7 +123,9 @@ class AssemblyAISTT:
         params = urlencode(
             {
                 "sample_rate": self.sample_rate,
+                "encoding": self.encoding,
                 "format_turns": str(self.format_turns).lower(),
+                "speech_model": self.speech_model,
             }
         )
         url = f"wss://streaming.assemblyai.com/v3/ws?{params}"

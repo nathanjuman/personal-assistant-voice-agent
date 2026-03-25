@@ -7,6 +7,7 @@ def _now_ms() -> int:
     """Returns current Unix timestamp in ms"""
     return int(time.time() * 1000)
 
+
 @dataclass
 class UserInputEvent:
     """
@@ -26,6 +27,7 @@ class UserInputEvent:
         """Creates UserInputEvent with current timestamp."""
         return cls(type="user_input", audio=audio, ts=_now_ms())
 
+
 @dataclass
 class STTChunkEvent:
     """
@@ -39,6 +41,7 @@ class STTChunkEvent:
     def create(cls, transcript: str) -> "STTChunkEvent":
         return cls(type="stt_chunk", transcript=transcript, ts=_now_ms())
 
+
 @dataclass
 class STTOutputEvent:
     """Event produced when final transcription result is processed."""
@@ -50,7 +53,9 @@ class STTOutputEvent:
     def create(cls, transcript: str) -> "STTOutputEvent":
         return cls(type="stt_output", transcript=transcript, ts=_now_ms())
 
+
 STTEvent = Union[STTChunkEvent, STTOutputEvent]
+
 
 @dataclass
 class AgentChunkEvent:
@@ -63,6 +68,7 @@ class AgentChunkEvent:
     def create(cls, text: str) -> "AgentChunkEvent":
         return cls(type="agent_chunk", text=text, ts=_now_ms())
 
+
 @dataclass
 class AgentEndEvent:
     """Event produced after agent's response is finished generating, signals downstream that turn is over (no more text is coming)"""
@@ -71,7 +77,12 @@ class AgentEndEvent:
 
     @classmethod
     def create(cls, text: str) -> "AgentEndEvent":
+        """
+
+        :rtype: "AgentEndEvent"
+        """
         return cls(type="agent_end", ts=_now_ms())
+
 
 @dataclass
 class ToolCallEvent:
@@ -85,6 +96,7 @@ class ToolCallEvent:
     @classmethod
     def create(cls, id: str, name: str, args: dict) -> "ToolCallEvent":
         return cls(type="tool_call", id=id, name=name, args=args, ts=_now_ms())
+
 
 @dataclass
 class ToolResultEvent:
@@ -105,10 +117,12 @@ class ToolResultEvent:
             ts=_now_ms(),
         )
 
+
 AgentEvent = Union[AgentChunkEvent, AgentEndEvent, ToolCallEvent, ToolResultEvent]
 """
 Union type of all agent-related events, enables type-safe handling of the stages in the agent response generation.
 """
+
 
 @dataclass
 class TTSChunkEvent:
@@ -122,6 +136,7 @@ class TTSChunkEvent:
         return cls(type="tts_chunk", audio=audio, ts=_now_ms())
 
 VoiceAgentEvent = Union[UserInputEvent, STTEvent, AgentEvent, TTSChunkEvent]
+
 
 def event_to_dict(event: VoiceAgentEvent) -> dict:
     """Converts VoiceAgentEvent to JSON-serializable dict."""

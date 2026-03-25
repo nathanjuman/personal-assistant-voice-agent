@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 .Python
 venv/
-.venv/
+components/backend/.venv/
 env/
 .env
 .env.*
@@ -16,3 +16,4 @@ env/
 *.swp
 .DS_Store
 Thumbs.db
+.cursor/
